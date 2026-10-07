@@ -92,26 +92,26 @@ window.onload = async function init() {
     }
 
     try {
-        const three = await import("/vendor/three.module.js");
+        const three = await import("../vendor/three.module.js");
         addCheck(checks, "Three.js（课程允许的备选栈）", true, "revision r" + three.REVISION);
     } catch (error) {
         addCheck(
             checks,
             "Three.js（课程允许的备选栈）",
             false,
-            "未找到 three。公共库应在 ~/GraphicsToolkit/vendor。\n" + error
+            "未能加载 ../vendor/three.module.js。\n" + error
         );
     }
 
     try {
-        const gui = await import("/vendor/lil-gui.esm.js");
+        const gui = await import("../vendor/lil-gui.esm.js");
         addCheck(checks, "lil-gui 参数面板", true, "可用于 AP1–AP3 的控件面板。\nexport: " + Object.keys(gui).join(", "));
     } catch (error) {
         addCheck(
             checks,
             "lil-gui 参数面板",
             false,
-            "未找到 lil-gui。公共库应在 ~/GraphicsToolkit/vendor。\n" + error
+            "未能加载 ../vendor/lil-gui.esm.js。\n" + error
         );
     }
 };
