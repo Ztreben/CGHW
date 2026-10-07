@@ -4,26 +4,152 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AP2 · 三维层级场景：太阳系</title>
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      font-family: "PingFang SC", "Hiragino Sans GB", sans-serif;
-      background: #0f1419;
-      color: #e8eef6;
-    }
-    main { text-align: center; padding: 24px; }
-    a { color: #7eb6e8; }
-    p { color: #9aa8b8; }
-  </style>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <main>
-    <p><a href="../">← 返回课程工作区</a></p>
-    <h1>AP2 · 太阳系</h1>
-    <p>作业目录已就绪。之后在这里做层级变换、投影切换和相机漫游。</p>
-  </main>
+  <div class="wrap">
+    <header>
+      <p><a href="../">← 返回课程工作区</a></p>
+      <h1>AP2 · 三维层级场景：太阳系</h1>
+      <p class="sub">WebGL 2.0 · 太阳–地球–月球层级变换 · 教材 Common 库</p>
+    </header>
+    <div class="layout">
+      <section class="stage">
+        <canvas id="gl-canvas" width="800" height="800">当前浏览器不支持 canvas。</canvas>
+        <p id="status" class="status">正在初始化…</p>
+      </section>
+      <aside class="panel">
+        <h2>参数</h2>
+        <div class="field">
+          <div class="label-row"><label for="orbit-rate">公转速度</label><output id="orbit-out">0.35</output></div>
+          <input id="orbit-rate" type="range" min="0" max="3" step="0.05" value="0.35">
+        </div>
+        <div class="field">
+          <div class="label-row"><label for="spin-rate">自转速度</label><output id="spin-out">0.45</output></div>
+          <input id="spin-rate" type="range" min="0" max="3" step="0.05" value="0.45">
+        </div>
+        <div class="field">
+          <div class="label-row"><label for="tilt">地球轴倾角</label><output id="tilt-out">23.5°</output></div>
+          <input id="tilt" type="range" min="0" max="90" step="0.5" value="23.5">
+          <p class="hint">倾角先写进地球自己的矩阵，再乘到公转轨道上。</p>
+        </div>
+        <div class="field">
+          <label class="check"><input id="show-orbits" type="checkbox" checked> 显示轨道线</label>
+        </div>
+        <div class="button-row">
+          <button type="button" id="tour-btn">开始漫游</button>
+          <button type="button" id="solar-btn">日食</button>
+          <button type="button" id="lunar-btn">月食</button>
+          <button type="button" id="clear-eclipse">恢复公转</button>
+        </div>
+        <section class="notes">
+          <h2>操作</h2>
+          <ul>
+            <li><kbd>O</kbd> 正交 / 透视</li>
+            <li><kbd>空格</kbd> 开始、暂停或继续环绕漫游</li>
+            <li>拖拽是虚拟轨迹球；漫游过程中一拖就会接管视角</li>
+            <li><kbd>R</kbd> 重置视角</li>
+            <li>滚轮拉近拉远</li>
+          </ul>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script id="mesh-vs" type="x-shader/x-vertex">
+#version 300 es
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
+layout(location = 2) in vec2 aTexCoord;
+uniform mat4 uMVP;
+uniform mat4 uModel;
+out vec3 vNormal;
+out vec3 vWorld;
+out vec2 vTex;
+void main() {
+    vec4 world = uModel * vec4(aPosition, 1.0);
+    vWorld = world.xyz;
+    vNormal = mat3(uModel) * aNormal;
+    vTex = aTexCoord;
+    gl_Position = uMVP * vec4(aPosition, 1.0);
+}
+  </script>
+  <script id="mesh-fs" type="x-shader/x-fragment">
+#version 300 es
+precision highp float;
+in vec3 vNormal;
+in vec3 vWorld;
+in vec2 vTex;
+uniform sampler2D uTex;
+uniform vec3 uCamera;
+uniform float uEmissive;
+uniform float uEclipse;
+uniform vec3 uOccluder;
+uniform float uOccRadius;
+out vec4 fColor;
+
+float hitSphere(vec3 ro, vec3 rd, vec3 c, float r) {
+    vec3 oc = ro - c;
+    float b = dot(oc, rd);
+    float h = b * b - (dot(oc, oc) - r * r);
+    if (h < 0.0) return -1.0;
+    h = sqrt(h);
+    float t = -b - h;
+    if (t > 0.02) return t;
+    t = -b + h;
+    if (t > 0.02) return t;
+    return -1.0;
+}
+
+void main() {
+    vec4 texel = texture(uTex, vTex);
+    if (uEmissive > 0.5) {
+        fColor = vec4(texel.rgb, 1.0);
+        return;
+    }
+    vec3 N = normalize(vNormal);
+    vec3 L = normalize(-vWorld);
+    float ndotl = max(dot(N, L), 0.0);
+    if (uEclipse > 0.5 && uOccRadius > 0.0) {
+        float t = hitSphere(vWorld, L, uOccluder, uOccRadius);
+        if (t > 0.0 && t < length(vWorld)) ndotl *= 0.04;
+    }
+    vec3 V = normalize(uCamera - vWorld);
+    float spec = pow(max(dot(N, normalize(L + V)), 0.0), 48.0) * step(0.15, ndotl);
+    vec3 color = texel.rgb * (0.07 + 0.93 * ndotl) + vec3(spec) * 0.22;
+    fColor = vec4(color, texel.a);
+}
+  </script>
+  <script id="line-vs" type="x-shader/x-vertex">
+#version 300 es
+layout(location = 0) in vec3 aPosition;
+uniform mat4 uMVP;
+uniform float uPointSize;
+void main() {
+    gl_Position = uMVP * vec4(aPosition, 1.0);
+    gl_PointSize = uPointSize;
+}
+  </script>
+  <script id="line-fs" type="x-shader/x-fragment">
+#version 300 es
+precision mediump float;
+uniform vec4 uColor;
+out vec4 fColor;
+void main() {
+    fColor = uColor;
+}
+  </script>
+
+  <script src="../Common/webgl-utils.js"></script>
+  <script src="../Common/initShaders.js"></script>
+  <script src="../Common/MV.js"></script>
+  <script src="js/geometry.js"></script>
+  <script src="js/textures.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/system.js"></script>
+  <script src="js/interaction.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>

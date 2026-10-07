@@ -4,26 +4,256 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AP3 · 光照与纹理场景</title>
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      font-family: "PingFang SC", "Hiragino Sans GB", sans-serif;
-      background: #0f1419;
-      color: #e8eef6;
-    }
-    main { text-align: center; padding: 24px; }
-    a { color: #7eb6e8; }
-    p { color: #9aa8b8; }
-  </style>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <main>
-    <p><a href="../">← 返回课程工作区</a></p>
-    <h1>AP3 · 光照与纹理</h1>
-    <p>作业目录已就绪。之后在这里写 Phong、纹理、环境贴图和阴影贴图。</p>
-  </main>
+  <div class="wrap">
+    <header>
+      <p><a href="../">← 返回课程工作区</a></p>
+      <h1>AP3 · 光照与纹理</h1>
+      <p class="sub">WebGL 2.0 · 手写 Phong · 纹理、环境贴图、阴影贴图 · 教材 Common 库</p>
+    </header>
+    <div class="layout">
+      <section class="stage">
+        <canvas id="gl-canvas" width="900" height="720">当前浏览器不支持 canvas。</canvas>
+        <p id="status" class="status">正在初始化…</p>
+      </section>
+      <aside class="panel">
+        <h2>光照分量</h2>
+        <label class="check"><input id="ambient-on" type="checkbox" checked> 环境光</label>
+        <label class="check"><input id="diffuse-on" type="checkbox" checked> 漫反射</label>
+        <label class="check"><input id="specular-on" type="checkbox" checked> 镜面</label>
+        <h2>选中物体 · <span id="selected-name">木箱</span></h2>
+        <div class="field">
+          <div class="label-row"><label for="ambient">环境光强度</label><output id="ambient-out">0.22</output></div>
+          <input id="ambient" type="range" min="0" max="1" step="0.01" value="0.22">
+        </div>
+        <div class="field">
+          <div class="label-row"><span>漫反射颜色</span></div>
+          <input id="diff-r" type="range" min="0" max="1" step="0.01" value="1">
+          <input id="diff-g" type="range" min="0" max="1" step="0.01" value="1">
+          <input id="diff-b" type="range" min="0" max="1" step="0.01" value="1">
+        </div>
+        <div class="field">
+          <div class="label-row"><label for="specular">镜面强度</label><output id="specular-out">0.20</output></div>
+          <input id="specular" type="range" min="0" max="1.5" step="0.01" value="0.2">
+        </div>
+        <div class="field">
+          <div class="label-row"><label for="shininess">高光指数</label><output id="shininess-out">18</output></div>
+          <input id="shininess" type="range" min="2" max="128" step="1" value="18">
+        </div>
+        <div class="field">
+          <div class="label-row"><label for="alpha">透明度</label><output id="alpha-out">1.00</output></div>
+          <input id="alpha" type="range" min="0.05" max="1" step="0.01" value="1">
+        </div>
+        <div class="field">
+          <div class="label-row"><label for="reflect">环境反射</label><output id="reflect-out">0.00</output></div>
+          <input id="reflect" type="range" min="0" max="1" step="0.01" value="0">
+        </div>
+        <h2>阴影与对比</h2>
+        <div class="field">
+          <div class="label-row"><label for="shadow-extent">方向光阴影范围</label><output id="extent-out">5.5</output></div>
+          <input id="shadow-extent" type="range" min="2" max="12" step="0.1" value="5.5">
+        </div>
+        <div class="field">
+          <div class="label-row"><label for="bias">深度偏移</label><output id="bias-out">0.0020</output></div>
+          <input id="bias" type="range" min="0" max="0.02" step="0.0001" value="0.002">
+          <p class="hint">偏移太小会出阴影痤疮，太大则影子和物体脱节。</p>
+        </div>
+        <label class="check"><input id="normal-on" type="checkbox" checked> 木箱用法线贴图</label>
+        <div class="field">
+          <div class="label-row"><label for="shade-mode">着色模型</label></div>
+          <select id="shade-mode">
+            <option value="0">Phong</option>
+            <option value="1">Blinn–Phong</option>
+            <option value="2">卡通</option>
+          </select>
+        </div>
+        <label class="check"><input id="compare" type="checkbox"> 左侧 Phong，右侧用当前模型并排对比</label>
+        <section class="notes">
+          <h2>操作</h2>
+          <ul>
+            <li>拖拽旋转视角，滚轮缩放</li>
+            <li>点击物体拾取，高亮后滑条改该物体材质</li>
+            <li>前面的木箱有法线贴图，后面那只没有，用来对比凹凸</li>
+            <li>金属球采样立方体环境贴图；玻璃板用 blend 混合</li>
+          </ul>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script id="phong-vs" type="x-shader/x-vertex">
+#version 300 es
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
+layout(location = 2) in vec2 aTexCoord;
+layout(location = 3) in vec3 aTangent;
+uniform mat4 uMVP;
+uniform mat4 uModel;
+out vec3 vWorld;
+out vec3 vNormal;
+out vec3 vTangent;
+out vec2 vTex;
+void main() {
+    vec4 world = uModel * vec4(aPosition, 1.0);
+    vWorld = world.xyz;
+    vNormal = mat3(uModel) * aNormal;
+    vTangent = mat3(uModel) * aTangent;
+    vTex = aTexCoord;
+    gl_Position = uMVP * vec4(aPosition, 1.0);
+}
+  </script>
+  <script id="phong-fs" type="x-shader/x-fragment">
+#version 300 es
+precision highp float;
+in vec3 vWorld;
+in vec3 vNormal;
+in vec3 vTangent;
+in vec2 vTex;
+uniform vec3 uCamera;
+uniform vec3 uDirDir;
+uniform vec3 uPointPos;
+uniform mat4 uDirVP;
+uniform mat4 uPointVP;
+uniform sampler2D uAlbedo;
+uniform sampler2D uNormalMap;
+uniform sampler2D uShadow;
+uniform sampler2D uPointShadow;
+uniform samplerCube uCube;
+uniform float uAmbient;
+uniform vec3 uDiffuse;
+uniform float uSpecular;
+uniform float uShininess;
+uniform int uAmbientOn;
+uniform int uDiffuseOn;
+uniform int uSpecularOn;
+uniform int uUseTex;
+uniform int uUseNormal;
+uniform float uReflect;
+uniform float uAlpha;
+uniform float uEmissive;
+uniform int uSelected;
+uniform int uShadeMode;
+uniform float uBias;
+uniform int uReceive;
+out vec4 fColor;
+
+float shadeAmount(vec3 N, vec3 L, vec3 V) {
+    float ndotl = max(dot(N, L), 0.0);
+    float spec;
+    if (uShadeMode == 1) {
+        spec = pow(max(dot(N, normalize(L + V)), 0.0), uShininess);
+    } else if (uShadeMode == 2) {
+        ndotl = floor(ndotl * 3.0) / 3.0;
+        spec = step(0.55, pow(max(dot(reflect(-L, N), V), 0.0), uShininess));
+    } else {
+        spec = pow(max(dot(reflect(-L, N), V), 0.0), uShininess);
+    }
+    return ndotl + spec * 0.001;
+}
+
+float specAmount(vec3 N, vec3 L, vec3 V) {
+    if (uShadeMode == 1) return pow(max(dot(N, normalize(L + V)), 0.0), uShininess);
+    if (uShadeMode == 2) return step(0.55, pow(max(dot(reflect(-L, N), V), 0.0), uShininess));
+    return pow(max(dot(reflect(-L, N), V), 0.0), uShininess);
+}
+
+float shadowOf(sampler2D map, vec4 clip) {
+    vec3 p = clip.xyz / clip.w;
+    p = p * 0.5 + 0.5;
+    if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0) return 1.0;
+    float closest = texture(map, p.xy).r;
+    return (p.z - uBias) > closest ? 0.38 : 1.0;
+}
+
+void main() {
+    vec3 N = normalize(vNormal);
+    vec3 T = normalize(vTangent);
+    T = normalize(T - N * dot(T, N));
+    vec3 B = cross(N, T);
+    if (uUseNormal == 1) {
+        vec3 tn = texture(uNormalMap, vTex).xyz * 2.0 - 1.0;
+        N = normalize(mat3(T, B, N) * tn);
+    }
+    vec3 kd = uDiffuse;
+    if (uUseTex == 1) kd *= texture(uAlbedo, vTex).rgb;
+    if (uEmissive > 0.5) {
+        fColor = vec4(kd, 1.0);
+        return;
+    }
+    vec3 V = normalize(uCamera - vWorld);
+    vec3 Ld = normalize(uDirDir);
+    vec3 LpVec = uPointPos - vWorld;
+    float dist = length(LpVec);
+    vec3 Lp = LpVec / max(dist, 0.001);
+    float atten = 1.0 / (1.0 + 0.14 * dist + 0.08 * dist * dist);
+    float diffD = max(dot(N, Ld), 0.0);
+    float diffP = max(dot(N, Lp), 0.0);
+    if (uShadeMode == 2) {
+        diffD = floor(diffD * 3.0) / 3.0;
+        diffP = floor(diffP * 3.0) / 3.0;
+    }
+    float specD = specAmount(N, Ld, V);
+    float specP = specAmount(N, Lp, V);
+    float dirShadow = uReceive == 1 ? shadowOf(uShadow, uDirVP * vec4(vWorld, 1.0)) : 1.0;
+    float pointShadow = uReceive == 1 ? shadowOf(uPointShadow, uPointVP * vec4(vWorld, 1.0)) : 1.0;
+    vec3 color = vec3(0.0);
+    if (uAmbientOn == 1) color += kd * uAmbient;
+    if (uDiffuseOn == 1) {
+        color += kd * diffD * dirShadow;
+        color += kd * diffP * atten * pointShadow * vec3(1.0, 0.92, 0.75);
+    }
+    if (uSpecularOn == 1) {
+        color += uSpecular * specD * dirShadow;
+        color += uSpecular * specP * atten * pointShadow;
+    }
+    if (uReflect > 0.0) {
+        vec3 R = reflect(normalize(vWorld - uCamera), N);
+        color = mix(color, texture(uCube, R).rgb, uReflect);
+    }
+    if (uSelected == 1) {
+        color += pow(1.0 - max(dot(N, V), 0.0), 2.2) * vec3(1.0, 0.82, 0.25);
+    }
+    fColor = vec4(color, uAlpha);
+}
+  </script>
+  <script id="depth-vs" type="x-shader/x-vertex">
+#version 300 es
+layout(location = 0) in vec3 aPosition;
+uniform mat4 uMVP;
+void main() {
+    gl_Position = uMVP * vec4(aPosition, 1.0);
+}
+  </script>
+  <script id="depth-fs" type="x-shader/x-fragment">
+#version 300 es
+precision highp float;
+void main() {}
+  </script>
+  <script id="pick-vs" type="x-shader/x-vertex">
+#version 300 es
+layout(location = 0) in vec3 aPosition;
+uniform mat4 uMVP;
+void main() { gl_Position = uMVP * vec4(aPosition, 1.0); }
+  </script>
+  <script id="pick-fs" type="x-shader/x-fragment">
+#version 300 es
+precision mediump float;
+uniform vec3 uColor;
+out vec4 fColor;
+void main() { fColor = vec4(uColor, 1.0); }
+  </script>
+
+  <script src="../Common/webgl-utils.js"></script>
+  <script src="../Common/initShaders.js"></script>
+  <script src="../Common/MV.js"></script>
+  <script src="js/geometry.js"></script>
+  <script src="js/textures.js"></script>
+  <script src="js/scene.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/interaction.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>
