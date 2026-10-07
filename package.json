@@ -1,0 +1,10 @@
+{
+  "name": "cg-course-webgl2",
+  "private": true,
+  "description": "课程作业目录。公共工具在 ~/GraphicsToolkit，任意文件夹可用 cg-serve / cg-init。",
+  "scripts": {
+    "start": "serve -l 5500 --no-clipboard -S",
+    "dev": "serve -l 5500 --no-clipboard -S",
+    "start:py": "python3 -m http.server 5500"
+  }
+}

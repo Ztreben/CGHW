@@ -1,0 +1,28 @@
+---
+description: 计算机图形学课程技术栈与作业约定
+alwaysApply: true
+---
+
+# 计算机图形学课程约定
+
+适用教材：Angel & Shreiner, *Interactive Computer Graphics*, 8th ed.
+
+## 技术栈
+
+- 原生 **WebGL 2.0** + JavaScript，或课程允许的 **Three.js**
+- 使用教材配套库：`Common/initShaders.js`、`Common/MV.js`、`Common/webgl-utils.js`
+- **无构建步骤**：不要引入 Vite / webpack / TypeScript 作为作业默认方案
+- 本地用 `npm start`（端口 5500）或任意静态服务器运行；提交须能从公网 URL 直接打开
+
+## 作业结构
+
+- AP1：`ap1/` 交互式 2D 分形
+- AP2：`ap2/` 三维层级场景（太阳系）
+- AP3：`ap3/` 光照与纹理场景
+- 环境自检：`env-check/`
+
+## 编码习惯
+
+- 着色器使用 `#version 300 es`（WebGL 2.0）
+- 几何 / 交互 / UI 尽量分文件；避免滥用全局变量
+- 引用他人代码须在 README 中注明出处

@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+*.log
+.cache/
+
+# 解压源码包时产生的副本，仓库里只保留 zip
+ap1/AP1-source/
+
+# 教材原件不放进公开仓库
+文件资料/*.pdf
+文件资料/*.pptx

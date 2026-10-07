@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>环境自检 · WebGL 2.0</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e8eef6;
+      --muted: #9aa8b8;
+      --ok: #3ecf8e;
+      --bad: #ef6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "SF Pro Text", "PingFang SC", "Hiragino Sans GB", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    main { max-width: 960px; margin: 0 auto; padding: 36px 20px 64px; }
+    a { color: #7eb6e8; }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    .sub { color: var(--muted); margin-bottom: 24px; }
+    .row { display: grid; grid-template-columns: 360px 1fr; gap: 24px; align-items: start; }
+    @media (max-width: 800px) { .row { grid-template-columns: 1fr; } }
+    canvas {
+      width: 360px;
+      height: 360px;
+      max-width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      display: block;
+    }
+    .checks { display: grid; gap: 10px; }
+    .item {
+      background: var(--panel);
+      border-radius: 10px;
+      padding: 12px 14px;
+      border: 1px solid #2a3a4e;
+    }
+    .item strong { display: block; margin-bottom: 4px; }
+    .ok { color: var(--ok); }
+    .bad { color: var(--bad); }
+    .meta { color: var(--muted); font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+    code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <p><a href="../">← 返回课程工作区</a></p>
+    <h1>环境自检</h1>
+    <p class="sub">若左侧出现白底红色三角形，且右侧检查项为通过，说明本课程环境可用。</p>
+
+    <div class="row">
+      <canvas id="gl-canvas" width="512" height="512">
+        你的浏览器不支持 canvas。
+      </canvas>
+      <div id="checks" class="checks"></div>
+    </div>
+  </main>
+
+  <script id="vertex-shader" type="x-shader/x-vertex">
+#version 300 es
+
+in vec4 aPosition;
+
+void main()
+{
+    gl_Position = aPosition;
+}
+  </script>
+
+  <script id="fragment-shader" type="x-shader/x-fragment">
+#version 300 es
+
+precision mediump float;
+
+out vec4 fColor;
+
+void main()
+{
+    fColor = vec4(1.0, 0.0, 0.0, 1.0);
+}
+  </script>
+
+  <script src="../Common/webgl-utils.js"></script>
+  <script src="../Common/initShaders.js"></script>
+  <script src="../Common/MV.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

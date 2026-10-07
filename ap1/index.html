@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AP1 · 交互式 2D 分形</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p><a href="../">← 返回课程工作区</a></p>
+      <h1>AP1 · 交互式 2D 分形</h1>
+      <p class="sub">WebGL 2.0 · 混沌游戏与递归细分 · 教材 Common 库</p>
+    </header>
+
+    <div class="layout">
+      <section class="stage">
+        <canvas id="gl-canvas" width="800" height="800">当前浏览器不支持 canvas。</canvas>
+        <p id="status" class="status">正在初始化…</p>
+      </section>
+
+      <aside class="panel">
+        <h2>参数</h2>
+
+        <div class="field">
+          <div class="label-row"><span>场景</span></div>
+          <div class="segment">
+            <label><input type="radio" name="scene" value="gasket" checked>二维垫片</label>
+            <label><input type="radio" name="scene" value="mandelbrot">Mandelbrot</label>
+            <label><input type="radio" name="scene" value="tetra">3D 四面体</label>
+          </div>
+        </div>
+
+        <div class="field" data-show="gasket">
+          <div class="label-row"><span>生成算法</span></div>
+          <div class="segment">
+            <label><input type="radio" name="generator" value="chaos" checked>混沌游戏</label>
+            <label><input type="radio" name="generator" value="recursive">递归细分</label>
+          </div>
+        </div>
+
+        <div class="field" data-show="gasket">
+          <div class="label-row"><span>垫片预设</span></div>
+          <div class="presets">
+            <button type="button" data-preset="triangle">三角形</button>
+            <button type="button" data-preset="pentagon">五边形垫片</button>
+            <button type="button" data-preset="hexagon">六边形垫片</button>
+          </div>
+        </div>
+
+        <div class="field" data-show="chaos">
+          <div class="label-row">
+            <label for="sides">边数 n</label>
+            <output id="sides-out">3</output>
+          </div>
+          <input id="sides" type="range" min="3" max="8" step="1" value="3">
+        </div>
+
+        <div class="field" data-show="chaos">
+          <div class="label-row">
+            <label for="copy-scale">收缩比 s</label>
+            <output id="scale-out">0.500</output>
+          </div>
+          <input id="copy-scale" type="range" min="0.25" max="0.65" step="0.001" value="0.5">
+          <p id="scale-hint" class="hint"></p>
+          <div class="presets" style="margin-top: 8px;">
+            <button type="button" id="use-recommended">用推荐收缩比</button>
+          </div>
+        </div>
+
+        <div class="field" data-show="chaos">
+          <div class="label-row"><label for="rule">选点规则</label></div>
+          <select id="rule">
+            <option value="any">任意顶点（教材）</option>
+            <option value="no-repeat">不重复上一顶点</option>
+            <option value="no-neighbor">不选相邻顶点</option>
+          </select>
+          <p class="hint">迭代 p ← s·p + (1−s)·顶点。s = 0.5 时就是 p ← (p + 顶点) / 2。</p>
+        </div>
+
+        <div class="field" data-show="chaos">
+          <div class="label-row">
+            <label for="point-count">顶点数</label>
+            <output id="point-count-out">20000</output>
+          </div>
+          <input id="point-count" type="range" min="5000" max="80000" step="1000" value="20000">
+        </div>
+
+        <div class="field" data-show="depth">
+          <div class="label-row">
+            <label for="depth">递归深度</label>
+            <output id="depth-out">4</output>
+          </div>
+          <input id="depth" type="range" min="0" max="6" step="1" value="4">
+          <p id="depth-hint" class="hint"></p>
+        </div>
+
+        <div class="field" data-show="shaped">
+          <div class="label-row"><span>渲染模式</span></div>
+          <div class="segment">
+            <label><input type="radio" name="mode" value="points" checked>点云</label>
+            <label><input type="radio" name="mode" value="lines">线框</label>
+            <label><input type="radio" name="mode" value="triangles">实体</label>
+          </div>
+          <p class="hint">点云对应 <kbd>1</kbd>，线框 <kbd>2</kbd>，实体 <kbd>3</kbd>。在混沌游戏里按 2 或 3 会改用递归细分。</p>
+        </div>
+
+        <div class="field" data-show="shaped">
+          <div class="label-row">
+            <label for="point-size">点大小</label>
+            <output id="point-size-out">2.5</output>
+          </div>
+          <input id="point-size" type="range" min="1" max="20" step="0.5" value="2.5">
+        </div>
+
+        <div class="field">
+          <div class="label-row"><label for="palette">配色</label></div>
+          <select id="palette">
+            <option value="0">原色</option>
+            <option value="1">海洋</option>
+            <option value="2">暮光</option>
+          </select>
+        </div>
+
+        <div data-show="mandelbrot">
+          <div class="field">
+            <div class="label-row">
+              <label for="max-iter">最大迭代</label>
+              <output id="max-iter-out">160</output>
+            </div>
+            <input id="max-iter" type="range" min="40" max="400" step="10" value="160">
+          </div>
+          <div class="field">
+            <label class="check"><input id="julia-toggle" type="checkbox"> 改看 Julia 集</label>
+          </div>
+          <div class="field">
+            <div class="presets">
+              <button type="button" data-preset="mandelbrot">全貌</button>
+              <button type="button" data-preset="mandelbrot-detail">放大到边界</button>
+            </div>
+          </div>
+          <div class="field" data-show="julia">
+            <div class="label-row">
+              <label for="julia-re">Julia 实部</label>
+              <output id="julia-re-out">-0.800</output>
+            </div>
+            <input id="julia-re" type="range" min="-1.5" max="1.5" step="0.001" value="-0.8">
+            <div class="label-row" style="margin-top: 8px;">
+              <label for="julia-im">Julia 虚部</label>
+              <output id="julia-im-out">0.156</output>
+            </div>
+            <input id="julia-im" type="range" min="-1.5" max="1.5" step="0.001" value="0.156">
+          </div>
+        </div>
+
+        <div class="field" data-show="tetra">
+          <label class="check"><input id="auto-spin" type="checkbox" checked> 自动旋转</label>
+          <p class="hint">左键拖拽转动，滚轮拉近拉远。细分只保留四个角上的小四面体。</p>
+        </div>
+
+        <div class="button-row">
+          <button type="button" id="anim-btn" data-show="shaped">暂停生长</button>
+          <button type="button" id="reset-view">重置视图</button>
+        </div>
+
+        <section class="notes">
+          <h2>操作</h2>
+          <ul>
+            <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 切换点云、线框、实体</li>
+            <li><kbd>空格</kbd> 暂停或继续逐点生长，长完后再按会重播</li>
+            <li><kbd>R</kbd> 或双击画面重置当前视图</li>
+            <li>左键拖拽平移；四面体场景里拖拽是转动</li>
+            <li>滚轮围绕光标缩放</li>
+            <li>在 Mandelbrot 里按 <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 会回到二维垫片</li>
+          </ul>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script id="shader-vs" type="x-shader/x-vertex">
+#version 300 es
+in vec4 aPosition;
+in vec4 aColor;
+uniform mat4 uMVP;
+uniform float uPointSize;
+out vec4 vColor;
+void main() {
+    gl_Position = uMVP * aPosition;
+    gl_PointSize = uPointSize;
+    vColor = aColor;
+}
+  </script>
+
+  <script id="shader-fs" type="x-shader/x-fragment">
+#version 300 es
+precision highp float;
+in vec4 vColor;
+uniform float uRoundPoints;
+out vec4 fColor;
+void main() {
+    if (uRoundPoints > 0.5) {
+        vec2 pc = gl_PointCoord - vec2(0.5);
+        if (dot(pc, pc) > 0.25) discard;
+    }
+    fColor = vColor;
+}
+  </script>
+
+  <script id="mandelbrot-vs" type="x-shader/x-vertex">
+#version 300 es
+in vec4 aPosition;
+out vec2 vClip;
+void main() {
+    vClip = aPosition.xy;
+    gl_Position = aPosition;
+}
+  </script>
+
+  <script id="mandelbrot-fs" type="x-shader/x-fragment">
+#version 300 es
+precision highp float;
+in vec2 vClip;
+uniform vec2 uCenter;
+uniform float uScale;
+uniform float uAspect;
+uniform int uMaxIter;
+uniform int uJulia;
+uniform vec2 uJuliaC;
+uniform int uPalette;
+out vec4 fColor;
+
+vec3 ramp(float t, vec3 a, vec3 b, vec3 c) {
+    if (t < 0.5) return mix(a, b, t * 2.0);
+    return mix(b, c, (t - 0.5) * 2.0);
+}
+
+vec3 exterior(float t, int which) {
+    if (which == 1) {
+        return ramp(t, vec3(0.03, 0.08, 0.16), vec3(0.15, 0.55, 0.72), vec3(0.86, 0.93, 0.84));
+    }
+    if (which == 2) {
+        return ramp(t, vec3(0.12, 0.04, 0.16), vec3(0.78, 0.28, 0.52), vec3(0.98, 0.82, 0.42));
+    }
+    return ramp(t, vec3(0.05, 0.10, 0.36), vec3(0.92, 0.32, 0.24), vec3(0.98, 0.88, 0.32));
+}
+
+void main() {
+    vec2 plane = uCenter + vec2(vClip.x * uAspect, vClip.y) * uScale;
+    vec2 z = uJulia == 1 ? plane : vec2(0.0);
+    vec2 c = uJulia == 1 ? uJuliaC : plane;
+    int iter = 0;
+    bool escaped = false;
+    for (int i = 0; i < 512; i++) {
+        if (i >= uMaxIter) break;
+        float x2 = z.x * z.x - z.y * z.y;
+        float y2 = 2.0 * z.x * z.y;
+        z = vec2(x2, y2) + c;
+        iter = i + 1;
+        if (dot(z, z) > 4.0) {
+            escaped = true;
+            break;
+        }
+    }
+    if (!escaped) {
+        fColor = vec4(0.015, 0.02, 0.035, 1.0);
+        return;
+    }
+    float mag2 = max(dot(z, z), 2.0);
+    float smoothIter = float(iter) + 1.0 - log2(log2(mag2));
+    float t = fract(smoothIter / 42.0);
+    fColor = vec4(exterior(t, uPalette), 1.0);
+}
+  </script>
+
+  <script src="../Common/webgl-utils.js"></script>
+  <script src="../Common/initShaders.js"></script>
+  <script src="../Common/MV.js"></script>
+  <script src="js/geometry.js"></script>
+  <script src="js/interaction.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

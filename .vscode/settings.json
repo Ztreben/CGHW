@@ -1,0 +1,11 @@
+{
+  "liveServer.settings.port": 5500,
+  "liveServer.settings.root": "/",
+  "files.associations": {
+    "*.vs": "glsl",
+    "*.fs": "glsl",
+    "*.vert": "glsl",
+    "*.frag": "glsl",
+    "*.glsl": "glsl"
+  }
+}
