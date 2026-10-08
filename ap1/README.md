@@ -6,15 +6,13 @@ WebGL 2.0 作业。用教材 `Common` 库画 Sierpinski 垫片：混沌游戏和
 
 | 方式 | 地址 |
 |---|---|
-| 给老师的公网链接 | https://ztreben.github.io/CGHW/ap1/ |
+| 公网链接 | https://ztreben.github.io/CGHW/ap1/ |
 | 仓库 | https://github.com/Ztreben/CGHW |
 | 本机 | http://localhost:5500/ap1/ |
 
 公网页面由 GitHub Pages 从 `main` 分支发布。不要用 `file://` 直接双击 HTML，着色器脚本和 `Common` 库都靠 HTTP 加载。
 
 ## 怎么运行
-
-新开的终端默认在家目录 `~`。`npm start` 只认当前目录里的 `package.json`，在家目录执行会报 `ENOENT`，因为 `/Users/zhangzezhen/package.json` 不存在。先进入课程目录再启动：
 
 ```bash
 cd "/Users/zhangzezhen/Desktop/FILE/College/计算机图形学"
@@ -124,15 +122,6 @@ s = 1 / (2 · (1 + Σ cos(2πk/n)))，k = 1 … ⌊n/4⌋
 | 双击或 `R` | 重置当前场景的视图 |
 | `1` `2` `3` | 点云、线框、实体。混沌游戏里按 `2` 或 `3` 会改用递归细分。在 Mandelbrot 里按这些键会回到二维垫片 |
 | 空格 | 暂停 / 继续逐点生长；长完后再按会重播 |
-
-## 现场可以怎么讲
-
-1. 打开页面，等混沌游戏长满，按空格重播并中途暂停。
-2. 切到递归细分，按 `1` `2` `3` 看同一深度的点云、线框、实体。
-3. 拖拽平移，滚轮缩放，按 `R` 复位。
-4. 点「五边形垫片」，说明 `s` 为什么不再是 1/2。
-5. 打开 Mandelbrot，滚轮放大，或点「放大到边界」。
-6. 打开 3D 四面体，拖一下视角，指出中间空掉的是八面体。
 
 ## 截图
 
