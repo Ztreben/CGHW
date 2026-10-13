@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>AP1 · 交互式 2D 分形</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -156,7 +157,7 @@
 
         <div class="field" data-show="tetra">
           <label class="check"><input id="auto-spin" type="checkbox" checked> 自动旋转</label>
-          <p class="hint">左键拖拽转动，滚轮拉近拉远。细分只保留四个角上的小四面体。</p>
+          <p class="hint">左键拖拽转动，滚轮拉近拉远。右上前方有一盏固定的点光源，不跟着模型转。朝向灯、离灯近的面更亮。细分只保留四个角上的小四面体。</p>
         </div>
 
         <div class="button-row">
@@ -183,13 +184,19 @@
 #version 300 es
 in vec4 aPosition;
 in vec4 aColor;
+in vec3 aNormal;
 uniform mat4 uMVP;
+uniform mat4 uModel;
 uniform float uPointSize;
 out vec4 vColor;
+out vec3 vWorldPos;
+flat out vec3 vWorldNormal;
 void main() {
     gl_Position = uMVP * aPosition;
     gl_PointSize = uPointSize;
     vColor = aColor;
+    vWorldPos = (uModel * aPosition).xyz;
+    vWorldNormal = mat3(uModel) * aNormal;
 }
   </script>
 
@@ -197,14 +204,29 @@ void main() {
 #version 300 es
 precision highp float;
 in vec4 vColor;
+in vec3 vWorldPos;
+flat in vec3 vWorldNormal;
 uniform float uRoundPoints;
+uniform float uUseLight;
+uniform vec3 uLightPos;
 out vec4 fColor;
 void main() {
     if (uRoundPoints > 0.5) {
         vec2 pc = gl_PointCoord - vec2(0.5);
         if (dot(pc, pc) > 0.25) discard;
     }
-    fColor = vColor;
+    vec3 color = vColor.rgb;
+    if (uUseLight > 0.5) {
+        vec3 toLight = uLightPos - vWorldPos;
+        float dist = length(toLight);
+        vec3 L = toLight / max(dist, 1e-4);
+        float diffuse = max(dot(normalize(vWorldNormal), L), 0.0);
+        // 按距离平方衰减。灯就在物体旁边，近的一角会明显亮过远处。
+        float att = 5.0 / (dist * dist);
+        float shade = 0.08 + att * diffuse;
+        color = min(color * shade, vec3(1.0));
+    }
+    fColor = vec4(color, vColor.a);
 }
   </script>
 

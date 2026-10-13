@@ -8,13 +8,18 @@
     var mandelLoc = null;
     var posBuffer = null;
     var colorBuffer = null;
+    var normalBuffer = null;
     var linePosBuffer = null;
     var lineColorBuffer = null;
+    var lineNormalBuffer = null;
     var quadBuffer = null;
     var meshKind = "points";
     var meshCount = 0;
     var lineCount = 0;
+    var hasNormals = false;
     var warned = false;
+    // 世界坐标。四面体在单位球里，相机在 +Z。灯固定在右上前方，离物体近一些，远近差才看得出来。
+    var LIGHT_POS = vec3(1.45, 1.05, 1.25);
 
     function compile(vsId, fsId) {
         var program = initShaders(gl, vsId, fsId);
@@ -28,9 +33,13 @@
         return {
             aPosition: gl.getAttribLocation(program, "aPosition"),
             aColor: gl.getAttribLocation(program, "aColor"),
+            aNormal: gl.getAttribLocation(program, "aNormal"),
             uMVP: gl.getUniformLocation(program, "uMVP"),
+            uModel: gl.getUniformLocation(program, "uModel"),
             uPointSize: gl.getUniformLocation(program, "uPointSize"),
-            uRoundPoints: gl.getUniformLocation(program, "uRoundPoints")
+            uRoundPoints: gl.getUniformLocation(program, "uRoundPoints"),
+            uUseLight: gl.getUniformLocation(program, "uUseLight"),
+            uLightPos: gl.getUniformLocation(program, "uLightPos")
         };
     }
 
@@ -52,8 +61,10 @@
 
         posBuffer = gl.createBuffer();
         colorBuffer = gl.createBuffer();
+        normalBuffer = gl.createBuffer();
         linePosBuffer = gl.createBuffer();
         lineColorBuffer = gl.createBuffer();
+        lineNormalBuffer = gl.createBuffer();
         quadBuffer = gl.createBuffer();
 
         gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
@@ -78,9 +89,10 @@
         gl.bufferData(gl.ARRAY_BUFFER, flatten(data), gl.STATIC_DRAW);
     }
 
-    function buildLines(positions, colors) {
+    function buildLines(positions, colors, normals) {
         var linePositions = [];
         var lineColors = [];
+        var lineNormals = [];
         var i;
         for (i = 0; i + 2 < positions.length; i += 3) {
             var tri = [i, i + 1, i + 2];
@@ -90,33 +102,54 @@
                 var i1 = tri[(e + 1) % 3];
                 linePositions.push(positions[i0], positions[i1]);
                 lineColors.push(colors[i0], colors[i1]);
+                if (normals) {
+                    lineNormals.push(normals[i0], normals[i1]);
+                }
             }
         }
-        return { positions: linePositions, colors: lineColors };
+        return { positions: linePositions, colors: lineColors, normals: normals ? lineNormals : null };
     }
 
     function upload(mesh) {
         meshKind = mesh.kind;
         meshCount = mesh.positions.length;
+        hasNormals = !!(mesh.normals && mesh.normals.length);
         uploadArray(posBuffer, mesh.positions);
         uploadArray(colorBuffer, mesh.colors);
+        if (hasNormals) {
+            uploadArray(normalBuffer, mesh.normals);
+        }
         if (mesh.kind === "triangles") {
-            var lines = buildLines(mesh.positions, mesh.colors);
+            var lines = buildLines(mesh.positions, mesh.colors, hasNormals ? mesh.normals : null);
             lineCount = lines.positions.length;
             uploadArray(linePosBuffer, lines.positions);
             uploadArray(lineColorBuffer, lines.colors);
+            if (lines.normals) {
+                uploadArray(lineNormalBuffer, lines.normals);
+            }
         } else {
             lineCount = 0;
         }
     }
 
-    function bindMeshAttribs(positionBuffer, colorBufferId) {
+    function bindMeshAttribs(positionBuffer, colorBufferId, normalBufferId) {
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.enableVertexAttribArray(meshLoc.aPosition);
         gl.vertexAttribPointer(meshLoc.aPosition, 4, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, colorBufferId);
         gl.enableVertexAttribArray(meshLoc.aColor);
         gl.vertexAttribPointer(meshLoc.aColor, 4, gl.FLOAT, false, 0, 0);
+        if (meshLoc.aNormal < 0) {
+            return;
+        }
+        if (normalBufferId) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, normalBufferId);
+            gl.enableVertexAttribArray(meshLoc.aNormal);
+            gl.vertexAttribPointer(meshLoc.aNormal, 3, gl.FLOAT, false, 0, 0);
+        } else {
+            gl.disableVertexAttribArray(meshLoc.aNormal);
+            gl.vertexAttrib3f(meshLoc.aNormal, 0, 0, 1);
+        }
     }
 
     function resize(canvas) {
@@ -134,24 +167,37 @@
         };
     }
 
-    function viewMatrix(state, aspect) {
+    function sceneMatrices(state, aspect) {
         if (state.scene === "tetra") {
             var projection = perspective(40, aspect, 0.1, 40);
             var camera = lookAt(vec3(0, 0, state.tetra.dist), vec3(0, 0, 0), vec3(0, 1, 0));
             var model = mult(rotateX(state.tetra.rotX), rotateY(state.tetra.rotY));
-            return mult(projection, mult(camera, model));
+            return {
+                model: model,
+                mvp: mult(projection, mult(camera, model))
+            };
         }
-        return mult(
-            translate(state.view.panX, state.view.panY, 0),
-            scale(state.view.zoom, state.view.zoom, 1)
-        );
+        return {
+            model: mat4(),
+            mvp: mult(
+                translate(state.view.panX, state.view.panY, 0),
+                scale(state.view.zoom, state.view.zoom, 1)
+            )
+        };
     }
 
     function drawMesh(state, surface, count, asPoints) {
+        var matrices = sceneMatrices(state, surface.aspect);
+        var useLight = state.scene === "tetra" && hasNormals;
         gl.useProgram(meshProgram);
-        gl.uniformMatrix4fv(meshLoc.uMVP, false, flatten(viewMatrix(state, surface.aspect)));
+        gl.uniformMatrix4fv(meshLoc.uMVP, false, flatten(matrices.mvp));
+        gl.uniformMatrix4fv(meshLoc.uModel, false, flatten(matrices.model));
         gl.uniform1f(meshLoc.uPointSize, state.pointSize * surface.dpr);
         gl.uniform1f(meshLoc.uRoundPoints, asPoints ? 1 : 0);
+        gl.uniform1f(meshLoc.uUseLight, useLight ? 1 : 0);
+        if (useLight) {
+            gl.uniform3fv(meshLoc.uLightPos, flatten(LIGHT_POS));
+        }
         if (state.scene === "tetra") {
             gl.enable(gl.DEPTH_TEST);
         } else {
@@ -176,6 +222,9 @@
         if (meshLoc.aColor >= 0 && meshLoc.aColor !== mandelLoc.aPosition) {
             gl.disableVertexAttribArray(meshLoc.aColor);
         }
+        if (meshLoc.aNormal >= 0 && meshLoc.aNormal !== mandelLoc.aPosition) {
+            gl.disableVertexAttribArray(meshLoc.aNormal);
+        }
         gl.uniform2f(mandelLoc.uCenter, view.cx, view.cy);
         gl.uniform1f(mandelLoc.uScale, view.scale);
         gl.uniform1f(mandelLoc.uAspect, surface.aspect);
@@ -195,16 +244,18 @@
             if (meshKind === "points") {
                 mode = "points";
             }
+            var normalsForMesh = hasNormals ? normalBuffer : null;
+            var normalsForLines = hasNormals ? lineNormalBuffer : null;
             if (mode === "lines" && lineCount > 0) {
-                bindMeshAttribs(linePosBuffer, lineColorBuffer);
+                bindMeshAttribs(linePosBuffer, lineColorBuffer, normalsForLines);
                 drawMesh(state, surface, lineCount, false);
             } else if (mode === "triangles") {
-                bindMeshAttribs(posBuffer, colorBuffer);
+                bindMeshAttribs(posBuffer, colorBuffer, normalsForMesh);
                 drawMesh(state, surface, meshCount, false);
             } else {
                 var shown = Math.max(0, Math.min(meshCount, state.drawn | 0));
                 if (shown > 0) {
-                    bindMeshAttribs(posBuffer, colorBuffer);
+                    bindMeshAttribs(posBuffer, colorBuffer, normalsForMesh);
                     drawMesh(state, surface, shown, true);
                 }
             }
