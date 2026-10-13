@@ -195,51 +195,45 @@
         };
     }
 
-    function tetraCentroid(a, b, c, d) {
-        return vec3(
-            (a[0] + b[0] + c[0] + d[0]) / 4,
-            (a[1] + b[1] + c[1] + d[1]) / 4,
-            (a[2] + b[2] + c[2] + d[2]) / 4
-        );
-    }
-
-    // 朝外是相对这个小四面体的中心，不能相对原点。细分后大部分小四面体不包住原点。
-    function outwardNormal(a, b, c, centroid) {
+    function outwardNormal(a, b, c) {
         var n = normalize(cross(subtract(b, a), subtract(c, a)));
         var mid = vec3(
             (a[0] + b[0] + c[0]) / 3,
             (a[1] + b[1] + c[1]) / 3,
             (a[2] + b[2] + c[2]) / 3
         );
-        if (dot(n, subtract(mid, centroid)) < 0) {
+        if (dot(n, mid) < 0) {
             n = vec3(-n[0], -n[1], -n[2]);
         }
         return n;
     }
 
-    function pushFace(positions, colors, normals, a, b, c, rgb, centroid) {
-        var color = vec4(rgb[0], rgb[1], rgb[2], 1);
-        var normal = outwardNormal(a, b, c, centroid);
+    function litColor(rgb, normal) {
+        var light = normalize(vec3(0.35, 0.62, 0.70));
+        var diffuse = Math.max(0, dot(normal, light));
+        var shade = 0.42 + 0.70 * diffuse;
+        return vec4(rgb[0] * shade, rgb[1] * shade, rgb[2] * shade, 1);
+    }
+
+    function pushFace(positions, colors, a, b, c, rgb) {
+        var color = litColor(rgb, outwardNormal(a, b, c));
         positions.push(vec4(a[0], a[1], a[2], 1));
         positions.push(vec4(b[0], b[1], b[2], 1));
         positions.push(vec4(c[0], c[1], c[2], 1));
         colors.push(color, color, color);
-        normals.push(normal, normal, normal);
     }
 
     // 每个小四面体画 4 个面。细分时只保留 4 个角，中间的八面体留空。
-    // 颜色先不乘光照，点光源在着色器里按世界坐标每帧计算。
-    function tetra(a, b, c, d, positions, colors, normals, palette) {
-        var centroid = tetraCentroid(a, b, c, d);
-        pushFace(positions, colors, normals, a, c, b, palette[0], centroid);
-        pushFace(positions, colors, normals, a, c, d, palette[1], centroid);
-        pushFace(positions, colors, normals, a, b, d, palette[2], centroid);
-        pushFace(positions, colors, normals, b, c, d, palette[3], centroid);
+    function tetra(a, b, c, d, positions, colors, palette) {
+        pushFace(positions, colors, a, c, b, palette[0]);
+        pushFace(positions, colors, a, c, d, palette[1]);
+        pushFace(positions, colors, a, b, d, palette[2]);
+        pushFace(positions, colors, b, c, d, palette[3]);
     }
 
-    function divideTetra(a, b, c, d, depth, positions, colors, normals, palette) {
+    function divideTetra(a, b, c, d, depth, positions, colors, palette) {
         if (depth <= 0) {
-            tetra(a, b, c, d, positions, colors, normals, palette);
+            tetra(a, b, c, d, positions, colors, palette);
             return;
         }
         var ab = mix(a, b, 0.5);
@@ -248,10 +242,10 @@
         var bc = mix(b, c, 0.5);
         var bd = mix(b, d, 0.5);
         var cd = mix(c, d, 0.5);
-        divideTetra(a, ab, ac, ad, depth - 1, positions, colors, normals, palette);
-        divideTetra(ab, b, bc, bd, depth - 1, positions, colors, normals, palette);
-        divideTetra(ac, bc, c, cd, depth - 1, positions, colors, normals, palette);
-        divideTetra(ad, bd, cd, d, depth - 1, positions, colors, normals, palette);
+        divideTetra(a, ab, ac, ad, depth - 1, positions, colors, palette);
+        divideTetra(ab, b, bc, bd, depth - 1, positions, colors, palette);
+        divideTetra(ac, bc, c, cd, depth - 1, positions, colors, palette);
+        divideTetra(ad, bd, cd, d, depth - 1, positions, colors, palette);
     }
 
     function subdivideTetra(depth, palette) {
@@ -263,13 +257,11 @@
         ];
         var positions = [];
         var colors = [];
-        var normals = [];
-        divideTetra(vertices[0], vertices[1], vertices[2], vertices[3], depth, positions, colors, normals, palette);
+        divideTetra(vertices[0], vertices[1], vertices[2], vertices[3], depth, positions, colors, palette);
         return {
             kind: "triangles",
             positions: positions,
-            colors: colors,
-            normals: normals
+            colors: colors
         };
     }
 
